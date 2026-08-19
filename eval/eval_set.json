@@ -1,0 +1,123 @@
+[
+  {
+    "id": "Q1",
+    "category": "Dataset Overview",
+    "query": "What is the total number of customers and overall churn rate in the dataset?",
+    "ground_truth": {
+      "total_customers": 7043,
+      "churn_rate_pct": 26.54,
+      "churn_count": 1869
+    },
+    "expected_key_facts": ["7043", "26.5", "1869"]
+  },
+  {
+    "id": "Q2",
+    "category": "Contract Aggregation",
+    "query": "What is the churn rate for Month-to-month contracts vs Two year contracts?",
+    "ground_truth": {
+      "month_to_month_churn_rate_pct": 42.71,
+      "two_year_churn_rate_pct": 2.83
+    },
+    "expected_key_facts": ["42.7", "2.8"]
+  },
+  {
+    "id": "Q3",
+    "category": "Internet Service Analysis",
+    "query": "Which internet service type has the highest churn rate and what is the percentage?",
+    "ground_truth": {
+      "highest_service": "Fiber optic",
+      "churn_rate_pct": 41.89
+    },
+    "expected_key_facts": ["Fiber optic", "41.9"]
+  },
+  {
+    "id": "Q4",
+    "category": "Single Customer Risk Lookup",
+    "query": "What is the churn risk score and prediction for customer 7590-VHVEG?",
+    "ground_truth": {
+      "customer_id": "7590-VHVEG",
+      "risk_percentage": 75.7,
+      "risk_level": "High",
+      "prediction": "Churn"
+    },
+    "expected_key_facts": ["75.7", "High", "Churn"]
+  },
+  {
+    "id": "Q5",
+    "category": "Single Customer Risk Lookup",
+    "query": "What is the churn risk score for customer 5575-GNVDE?",
+    "ground_truth": {
+      "customer_id": "5575-GNVDE",
+      "prediction": "Retained"
+    },
+    "expected_key_facts": ["5575-GNVDE", "Retained"]
+  },
+  {
+    "id": "Q6",
+    "category": "What-If Scenario Simulation",
+    "query": "What if customer 7590-VHVEG switches to a Two year contract with TechSupport?",
+    "ground_truth": {
+      "customer_id": "7590-VHVEG",
+      "reduced_risk": true
+    },
+    "expected_key_facts": ["Two year", "TechSupport"]
+  },
+  {
+    "id": "Q7",
+    "category": "Revenue & Spend Analysis",
+    "query": "What is the average monthly charges for churned customers vs retained customers?",
+    "ground_truth": {
+      "churned_avg_monthly": 74.44,
+      "retained_avg_monthly": 61.27
+    },
+    "expected_key_facts": ["74.44", "61.27"]
+  },
+  {
+    "id": "Q8",
+    "category": "Payment Method Correlation",
+    "query": "Which payment method has the highest churn rate?",
+    "ground_truth": {
+      "highest_payment_method": "Electronic check",
+      "churn_rate_pct": 45.29
+    },
+    "expected_key_facts": ["Electronic check", "45.3"]
+  },
+  {
+    "id": "Q9",
+    "category": "Demographic Analysis",
+    "query": "What is the churn rate among senior citizens vs non-senior citizens?",
+    "ground_truth": {
+      "senior_churn_rate_pct": 41.68,
+      "non_senior_churn_rate_pct": 23.61
+    },
+    "expected_key_facts": ["41.7", "23.6"]
+  },
+  {
+    "id": "Q10",
+    "category": "Customer Tenure Breakdown",
+    "query": "What is the churn rate for new customers in their first 6 months?",
+    "ground_truth": {
+      "early_tenure_churn_rate_pct": 53.0
+    },
+    "expected_key_facts": ["tenure", "churn"]
+  },
+  {
+    "id": "Q11",
+    "category": "Tech Support Impact",
+    "query": "Does having TechSupport reduce churn risk?",
+    "ground_truth": {
+      "no_tech_support_churn_rate_pct": 41.64,
+      "tech_support_churn_rate_pct": 15.17
+    },
+    "expected_key_facts": ["41.6", "15.2"]
+  },
+  {
+    "id": "Q12",
+    "category": "High Risk Customer Identification",
+    "query": "Which customers are most likely to churn?",
+    "ground_truth": {
+      "segment": "Month-to-month customers"
+    },
+    "expected_key_facts": ["Month-to-month", "3875"]
+  }
+]

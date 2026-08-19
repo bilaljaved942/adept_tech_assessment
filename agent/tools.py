@@ -25,18 +25,47 @@ class ToolRegistry:
         if code.endswith("```"): code = code[:-3]
         code = code.strip()
 
+        import sklearn
+        from sklearn.model_selection import train_test_split
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.ensemble import RandomForestClassifier
+
+        def custom_print(*args, **kwargs):
+            return print(*args, **kwargs)
+
         safe_globals = {
+            "__builtins__": {
+                "print": custom_print,
+                "range": range,
+                "len": len,
+                "int": int,
+                "float": float,
+                "str": str,
+                "bool": bool,
+                "list": list,
+                "dict": dict,
+                "set": set,
+                "tuple": tuple,
+                "min": min,
+                "max": max,
+                "sum": sum,
+                "abs": abs,
+                "round": round,
+                "sorted": sorted,
+                "enumerate": enumerate,
+                "zip": zip,
+                "__import__": __import__,
+            },
             "pd": pd,
             "np": np,
             "math": math,
             "df": self.df.copy(),
-            "__builtins__": {
-                "abs": abs, "all": all, "any": any, "bool": bool, "dict": dict,
-                "enumerate": enumerate, "filter": filter, "float": float, "int": int,
-                "len": len, "list": list, "map": map, "max": max, "min": min,
-                "print": print, "range": range, "round": round, "set": set,
-                "sorted": sorted, "str": str, "sum": sum, "tuple": tuple, "zip": zip
-            }
+            "sklearn": sklearn,
+            "train_test_split": train_test_split,
+            "StandardScaler": StandardScaler,
+            "LogisticRegression": LogisticRegression,
+            "RandomForestClassifier": RandomForestClassifier,
         }
         
         local_vars = {}
