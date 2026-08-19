@@ -22,6 +22,7 @@ def get_data() -> pd.DataFrame:
     if _DATA_DF is None:
         df = pd.read_csv(DATA_PATH)
         df["TotalCharges"] = pd.to_numeric(df["TotalCharges"].astype(str).str.strip(), errors="coerce").fillna(0.0)
+        df["Churn_binary"] = (df["Churn"] == "Yes").astype(int)
         _DATA_DF = df
     return _DATA_DF
 

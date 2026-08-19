@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend-and-streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: churn-analyst-backend
+    ports:
+      - "8000:8000"   # FastAPI Backend
+      - "8501:8501"   # Streamlit App
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
+    volumes:
+      - ./results:/app/results
+    restart: unless-stopped
+
+  frontend-react:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: churn-analyst-react
+    ports:
+      - "5173:5173"   # React Frontend
+    depends_on:
+      - backend-and-streamlit
+    restart: unless-stopped
