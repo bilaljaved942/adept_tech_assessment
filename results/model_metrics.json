@@ -1,0 +1,6 @@
+{
+  "model": "Random Forest (Balanced)",
+  "roc_auc": 0.8434110930274614,
+  "pr_auc": 0.6510089015517215,
+  "test_accuracy": 0.7487579843860894
+}
