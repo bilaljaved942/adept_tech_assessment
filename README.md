@@ -107,7 +107,28 @@ If a naive model simply predicted that *nobody ever churns*, it would achieve a 
 
 ---
 
-## 5. Reflection
+## 5. Engineering Thought Process & Design Notes
+
+Below are the handwritten design notes captured during the initial architecture, pipeline formulation, and debugging phases of the assessment:
+
+<div align="center">
+  <img src="docs/note1.jpeg" width="46%" alt="ML Pipeline, Imbalance & Metric Strategy" />
+  &nbsp;&nbsp;
+  <img src="docs/note2.jpeg" width="46%" alt="Agent Loop, Sandbox & Critic Design" />
+</div>
+
+### Key Milestones Captured in Notes:
+1. **Stage 1 (ML Pipeline & Imbalance Discovery)**:
+   - Formulating data preprocessing across numerical and categorical features.
+   - Diagnosing the **73.5% vs 26.5% class imbalance** and selecting a Balanced Random Forest with **ROC-AUC & Recall** rather than misleading simple accuracy.
+2. **Stage 2 & 3 (Agent Architecture & Troubleshooting)**:
+   - Designing the **Program-Aided Language (PAL)** execution sandbox so the LLM writes code instead of guessing arithmetic.
+   - Troubleshooting Groq API model deprecations (resolving 404/400 errors with dynamic model cascades).
+   - Establishing the **Critic Agent** guardrail to mathematically verify all figures and eliminate hallucinations.
+
+---
+
+## 6. Reflection
 
 ### What was the hardest part?
 The hardest part was striking the right balance between LLM reasoning flexibility and strict mathematical grounding. Initially, the LLM would try to write long scripts (even trying to train logistic regression models on the fly during chat), which would hit token limits or fail to print output. Refining the prompt to enforce concise 3–8 line pandas queries and building the numerical Critic verification engine took the most iteration.
@@ -121,7 +142,7 @@ I deepened my understanding of the **Program-Aided Language (PAL)** agent design
 
 ---
 
-## 6. Honest Note on Time Spent (~8–10 Hours)
+## 7. Honest Note on Time Spent (~8–10 Hours)
 
 Here is an honest breakdown of where the time was spent across the assessment:
 
@@ -136,13 +157,13 @@ Here is an honest breakdown of where the time was spent across the assessment:
 
 ---
 
-## 7. AI Tool Disclosure
+## 8. AI Tool Disclosure
 
 In accordance with the assessment guidelines, I used AI assistants (such as Antigravity / Claude) to accelerate React component scaffolding, format markdown tables, and assist in generating diverse test queries. All core machine learning architecture, pipeline preprocessing decisions, sandbox execution logic, and anti-hallucination verification algorithms were designed, implemented, and validated directly.
 
 ---
 
-## 8. How to Run Locally or With Docker
+## 9. How to Run Locally or With Docker
 
 ### Option 1: Docker Compose (Runs Full Stack)
 ```bash
