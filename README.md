@@ -136,7 +136,13 @@ Here is an honest breakdown of where the time was spent across the assessment:
 
 ---
 
-## 7. How to Run Locally or With Docker
+## 7. AI Tool Disclosure
+
+In accordance with the assessment guidelines, I used AI assistants (such as Antigravity / Claude) to accelerate React component scaffolding, format markdown tables, and assist in generating diverse test queries. All core machine learning architecture, pipeline preprocessing decisions, sandbox execution logic, and anti-hallucination verification algorithms were designed, implemented, and validated directly.
+
+---
+
+## 8. How to Run Locally or With Docker
 
 ### Option 1: Docker Compose (Runs Full Stack)
 ```bash
