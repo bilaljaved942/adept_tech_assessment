@@ -1,6 +1,6 @@
 """
 Streamlit Chat Application: Autonomous Data Analyst.
-Stage 2 & Stage 3 Assessment Implementation.
+Clean, responsive interface with automated backend integration.
 """
 
 import os
@@ -19,15 +19,20 @@ st.set_page_config(
     page_title="Autonomous Data Analyst — Customer Churn",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom Styling
+# Custom Responsive Styling
 st.markdown("""
 <style>
-    .main-title { font-size: 2.2rem; font-weight: 700; color: #1E88E5; margin-bottom: 0px; }
-    .sub-title { font-size: 1.05rem; color: #555; margin-bottom: 20px; }
-    .verified-badge { background-color: #E8F5E9; color: #2E7D32; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; display: inline-block; }
+    @media (max-width: 768px) {
+        .main-title { font-size: 1.6rem !important; }
+        .stMetric { padding: 4px !important; }
+    }
+    .main-title { font-size: 2.0rem; font-weight: 700; color: #4F46E5; margin-bottom: 2px; }
+    .sub-title { font-size: 0.95rem; color: #64748B; margin-bottom: 14px; }
+    .verified-badge { background-color: #ECFDF5; color: #059669; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-block; }
+    div[data-testid="stMetricValue"] { font-size: 1.3rem !important; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,78 +46,72 @@ if "agent" not in st.session_state:
 
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=64)
-    st.title("Settings & Tools")
+    st.title("🤖 Quick Tools")
     
-    st.subheader("LLM Configuration")
-    provider = st.selectbox("Provider", ["Groq (Free)", "Built-in Autonomous Engine"], index=0)
-    api_key_input = st.text_input(
-        "API Key (Optional)",
-        type="password",
-        value=os.getenv("GROQ_API_KEY", ""),
-        help="Enter free Groq API key or leave empty to use built-in engine."
-    )
-    if st.button("Update Agent"):
-        st.session_state.agent = AutonomousDataAgent(api_key=api_key_input if api_key_input else None)
-        st.success("Agent updated!")
-
-    st.markdown("---")
-    st.subheader("💡 Quick Sample Questions")
+    st.subheader("💡 Sample Questions")
     samples = [
         "Which customers are most likely to churn?",
         "What is the churn risk for customer 7590-VHVEG?",
         "Does churn risk correlate with contract type?",
         "Show me churn rate by internet service.",
-        "What is the revenue trend for high-risk customers?",
-        "What if customer 7590-VHVEG switches to a Two year contract with TechSupport?"
+        "Show me revenue trend for high risk customers."
     ]
     for q in samples:
         if st.button(q, key=f"btn_{q}"):
             st.session_state.current_prompt = q
 
     st.markdown("---")
-    st.subheader("🔮 Single Customer Simulator")
-    cid_input = st.selectbox("Select Customer ID", df["customerID"].head(30).tolist())
-    override_contract = st.selectbox("What-if Contract", ["Keep Original", "Month-to-month", "One year", "Two year"])
-    override_tech = st.selectbox("What-if Tech Support", ["Keep Original", "Yes", "No"])
+    st.subheader("🔍 Single Customer Simulator")
+    selected_customer = st.selectbox(
+        "Select Customer ID",
+        df["customerID"].head(30).tolist(),
+        index=0
+    )
+    what_if_contract = st.selectbox(
+        "What-if Contract Override",
+        ["Keep Original", "Month-to-month", "One year", "Two year"],
+        index=0
+    )
+    what_if_tech = st.selectbox(
+        "What-if Tech Support Override",
+        ["Keep Original", "Yes", "No"],
+        index=0
+    )
     
-    if st.button("Run Simulation"):
+    if st.button("Run Simulation", type="primary"):
         overrides = {}
-        if override_contract != "Keep Original": overrides["Contract"] = override_contract
-        if override_tech != "Keep Original": overrides["TechSupport"] = override_tech
-        
-        sim_res = predict_churn_risk(cid_input, overrides=overrides if overrides else None)
-        if sim_res.get("status") == "success":
-            st.metric("Projected Churn Risk", sim_res["risk_percentage"], delta=sim_res["risk_level"])
-            st.write(f"**Prediction**: {sim_res['prediction']}")
-            st.write("**Top Factors**:")
-            for f in sim_res["top_factors"]:
-                st.write(f"- {f}")
+        if what_if_contract != "Keep Original":
+            overrides["Contract"] = what_if_contract
+        if what_if_tech != "Keep Original":
+            overrides["TechSupport"] = what_if_tech
+            
+        with st.spinner("Calculating Risk Score..."):
+            res = predict_churn_risk(selected_customer, overrides=overrides if overrides else None)
+            if res.get("status") != "error":
+                st.metric("Churn Risk Score", res["risk_percentage"], delta=f"{res['risk_level']} Risk", delta_color="inverse")
+                st.write(f"**Prediction**: {res['prediction']}")
+                st.write("**Top Risk Drivers**:")
+                for f in res["top_factors"]:
+                    st.write(f"- {f}")
 
-# ----------------- MAIN UI -----------------
-st.markdown('<div class="main-title">🤖 Autonomous Data Analyst Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">AI Agent for Churn Prediction, Multi-Step Analytics & Data Exploration</div>', unsafe_allow_html=True)
+# ----------------- MAIN VIEW -----------------
+st.markdown('<div class="main-title">Autonomous Data Analyst Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Natural language dataset analytics, single-customer predictions & counterfactual simulations.</div>', unsafe_allow_html=True)
 
-# Render KPI metric cards
+# Compact KPI Cards
 render_kpi_cards(df)
 
 st.markdown("---")
 
-# Display Messages
+# Render Chat History
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "chart" in msg and msg["chart"]:
-            render_chart(msg["chart"], df)
-        if "steps" in msg and msg["steps"]:
-            with st.expander("🔍 View Agent Execution Trace & Critic Review"):
-                for s in msg["steps"]:
-                    st.write(s)
-                st.markdown(f'<div class="verified-badge">{msg.get("critic_status", "Verified")}</div>', unsafe_allow_html=True)
+            render_chart(df, msg["chart"])
 
-# Chat Input
-prompt = st.chat_input("Ask a question about customer churn, distributions, or predictions...")
-
+# Handle Inputs
+prompt = st.chat_input("Ask a question about churn trends, correlations, or customer IDs...")
 if "current_prompt" in st.session_state and st.session_state.current_prompt:
     prompt = st.session_state.current_prompt
     st.session_state.current_prompt = None
@@ -123,31 +122,16 @@ if prompt:
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent is planning steps and executing queries against the dataset..."):
-            try:
-                response = st.session_state.agent.run_query(prompt)
-                ans = response["answer"]
-                steps = response.get("steps", [])
-                chart = response.get("chart", None)
-                critic = response.get("critic_status", "Verified")
+        with st.spinner("Planning & executing query against customer dataset..."):
+            response = st.session_state.agent.run_query(prompt)
+            
+            st.markdown(response["answer"])
+            
+            if response.get("chart"):
+                render_chart(df, response["chart"])
                 
-                st.markdown(ans)
-                if chart:
-                    render_chart(chart, df)
-                    
-                with st.expander("🔍 View Agent Execution Trace & Critic Review"):
-                    for s in steps:
-                        st.write(s)
-                    st.markdown(f'<div class="verified-badge">{critic}</div>', unsafe_allow_html=True)
-                    
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": ans,
-                    "steps": steps,
-                    "chart": chart,
-                    "critic_status": critic
-                })
-            except Exception as e:
-                err = f"⚠️ Error: {str(e)}"
-                st.error(err)
-                st.session_state.messages.append({"role": "assistant", "content": err})
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": response["answer"],
+                "chart": response.get("chart")
+            })

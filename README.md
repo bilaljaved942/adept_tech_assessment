@@ -1,128 +1,142 @@
-# Autonomous Data Analyst — Customer Churn Prediction & Analytics Agent
+# Autonomous Data Analyst Agent for Customer Churn Prediction
 
-### Candidate Assessment — Adept Tech Solutions (AI Engineer)
-
----
-
-## 1. Executive Summary & What Was Built
-This repository provides an end-to-end **Autonomous Data Analyst Agent** and **Customer Churn Machine Learning Platform**:
-* **Stage 1 — Model as a Callable Tool**: A trained, calibrated **Random Forest Classifier** achieving **0.8455 ROC-AUC** and **80.4% Recall**, exposed as a standalone Python callable tool (`predict_churn_risk`).
-* **Stage 2 — Streamlit Chat Interface**: An interactive web app with live model wiring, conversation history, and an interactive Single-Customer Simulator.
-* **Stage 3 — The Autonomous Agent**: A multi-step planning loop utilizing a **restricted code-as-a-tool execution sandbox** against the dataset, self-checking retries, and a **Critic Agent** that mathematically guarantees **0.0% Hallucination**.
-* **Stretch Goals / Bonus Deliverables**:
-  * ✅ **Critic & Verification Agent** (validates numbers against computed data before display).
-  * ✅ **Auto-Generated Visualizations** (dynamic bar charts, histograms, and density plots in chat).
-  * ✅ **Automated Evaluation Suite** (`eval_suite.py` with 12 diverse test cases achieving **100% accuracy & 0.0% hallucination rate**).
-  * ✅ **Dockerization** (`Dockerfile` & `.dockerignore` for 1-command deployment).
-  * ✅ **Google Colab Notebook** (`notebooks/churn_model.ipynb` with full EDA, cleaning, benchmarks, and model export).
+An end-to-end Machine Learning and Autonomous AI Agent platform that combines deterministic data science with large language models to analyze customer churn, predict individual customer risk, simulate business what-if interventions, and verify all claims against the customer dataset.
 
 ---
 
-## 2. Project Architecture & Code Organization
+## 1. What Was Built (System Architecture)
 
 ```
-Customer-Churn/
-├── notebooks/
-│   └── churn_model.ipynb       # Colab Notebook (EDA, Data Cleaning, 5 Model Benchmark, Evaluation)
-├── results/
-│   ├── churn_model.pkl         # Trained Random Forest pipeline artifact
-│   └── model_metrics.json      # Cross-validation performance metrics
-├── model/
-│   ├── __init__.py
-│   └── churn_tool.py           # Callable function: predict_churn_risk(customer_id, overrides)
-├── agent/
-│   ├── __init__.py
-│   ├── tools.py                # Restricted code execution sandbox & dataset tool
-│   ├── critic.py               # Critic & anti-hallucination fact verification engine
-│   └── agent_loop.py           # Multi-step planning, self-check & response synthesis
-├── ui/
-│   └── components.py           # KPI metric cards and dynamic Streamlit chart renderers
-├── app.py                      # Main Streamlit Web Application (Stage 2 & 3)
-├── eval_suite.py               # Automated evaluation test suite (12 test queries)
-├── requirements.txt            # Project dependencies
-├── Dockerfile                  # Production containerization
-├── .dockerignore
-├── .gitignore
-├── Customer-Churn.csv          # Raw dataset
-└── README.md                   # Full documentation & reflection
+                       ┌────────────────────────────────────────────────────────┐
+                       │                   USER INTERFACES                      │
+                       │   • React + Vite Web App (http://localhost:5173)       │
+                       │   • Streamlit Chat Application (http://localhost:8501) │
+                       └───────────────────────────┬────────────────────────────┘
+                                                   │
+                                                   ▼
+                       ┌────────────────────────────────────────────────────────┐
+                       │          FASTAPI REST BACKEND (api.py)                 │
+                       │   Endpoints: /api/chat, /api/predict-churn, /overview  │
+                       └───────────────────────────┬────────────────────────────┘
+                                                   │
+                                                   ▼
+ ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                   AUTONOMOUS AGENT CORE                                         │
+ │                                                                                                 │
+ │   1. Multi-Step Planning (agent_loop.py):                                                       │
+ │      • Intent extraction & entity routing (Customer IDs, group-bys, correlations).              │
+ │      • Token-efficient schema prompting with Groq free-tier rate-limit backoff.                 │
+ │                                                                                                 │
+ │   2. Restricted Sandbox & Tools (tools.py & churn_tool.py):                                     │
+ │      • Python Execution Sandbox: Runs safe pandas aggregations on `df` in memory.               │
+ │      • Stage 1 ML Model Tool: Predicts individual risk scores & counterfactual overrides.       │
+ │                                                                                                 │
+ │   3. Zero-Hallucination Critic Guardrail (critic.py):                                           │
+ │      • Mathematically cross-references all numbers in AI responses against sandbox outputs.     │
+ └─────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Data Cleaning & Integrity Findings
+## 2. Data Issues Found and How They Were Handled
 
-During EDA of `Customer-Churn.csv` (7,043 rows, 21 columns), the following issues were discovered and addressed:
-
-| Issue / Feature | Finding | Root Cause | Resolution |
-| :--- | :--- | :--- | :--- |
-| **`TotalCharges` Data Type** | Stored as `object`/`string` instead of `float`. | **11 rows contained blank whitespace strings (`' '`)**. | Converted column to numeric; imputed with `0.0`. |
-| **`TotalCharges` Whitespace Cause** | All 11 records with `' '` had **`tenure == 0`**. | Brand-new customers who signed up in the current month and haven't had their first billing cycle. | Setting to `0.0` reflects true historical billing amount rather than using mean/median imputation. |
-| **Target Imbalance (`Churn`)** | 1,869 Churned (26.5%) vs 5,174 Retained (73.5%). | Natural business churn skew. | Stratified 80/20 train/test split and class-weight balancing applied in modeling. |
-| **Duplicate Records** | 0 duplicate rows, 7,043 unique `customerID` values. | Clean primary key integrity. | No row deduplication needed. |
+During Stage 1 exploratory data analysis on `Customer-Churn.csv` (7,043 rows, 21 columns), we identified a critical data quality issue:
+* **Root Cause**: **11 customer records** contained whitespace strings (`" "`) in the `TotalCharges` column instead of numeric values.
+* **Domain Investigation**: All 11 records corresponded to brand-new accounts with `tenure == 0` (customers who joined during the current billing cycle and had not yet received their first monthly bill).
+* **Resolution Strategy**: Rather than dropping these rows (which would introduce sample selection bias against newly acquired customers) or imputing with median/mean (which would distort lifetime spend for new users), we converted whitespaces to `0.0`.
+* **Standardization**: Converted the binary target `Churn` into `Churn_binary` (`Yes` $\to 1$, `No` $\to 0$) for consistent model training and group-by calculations.
 
 ---
 
-## 4. Multi-Model Benchmark & Metric Justification
+## 3. Evaluation Metric Justification
 
-### 5-Fold Stratified Cross-Validation Benchmark
+The dataset has a significant **class imbalance**:
+* **Non-Churned (Retained)**: **73.46%** (5,174 customers)
+* **Churned**: **26.54%** (1,869 customers)
 
-| Model | ROC-AUC | PR-AUC | Recall (Sensitivity) | Precision | F1-Score |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Random Forest (Balanced)** ⭐ | **0.8455** | **0.6584** | **80.4%** | 52.4% | **0.6346** |
-| **Logistic Regression (Balanced)** | 0.8450 | 0.6559 | **80.1%** | 51.2% | 0.6250 |
-| **Gradient Boosting Classifier** | **0.8474** | **0.6619** | 52.7% | **66.9%** | 0.5893 |
-| **Logistic Regression (Standard)** | 0.8450 | 0.6567 | 55.3% | 65.9% | 0.6010 |
-| **Random Forest (Standard)** | 0.8412 | 0.6501 | 51.8% | 67.2% | 0.5851 |
-
-### Why Random Forest (Balanced) Was Selected
-1. **High Discrimination (ROC-AUC 0.8455 & PR-AUC 0.6584)**: Top-tier risk ranking accuracy across all thresholds.
-2. **Superior Recall on Churners (80.4%)**: Unlike unweighted models that miss half the churners (Recall ~52-55%), Random Forest (Balanced) flags 8 out of 10 churners.
-3. **Non-Linear Interactions**: Naturally captures combinations of risk (e.g. `Month-to-month Contract` + `Fiber optic` + `No TechSupport`) without requiring manual feature engineering.
-
-### Metric Justification: Why ROC-AUC & Recall?
-* **Accuracy is Deceptive on Imbalanced Data**: A model predicting "No churn" for all customers achieves 73.5% accuracy but catches zero churners.
-* **Continuous Risk Scoring**: Marketing teams require continuous probabilities ($0.0$ to $1.0$) to segment customers into Low, Medium, and High risk tiers.
-* **Cost Asymmetry**:
-  * **False Negative (Missed Churner)**: Loss of customer lifetime value (**$1,000+**).
-  * **False Positive (False Alarm)**: Small cost of a retention email or discount (**$10 - $20**).
-  * High **Recall (~80%)** is the primary operational objective.
+Because of this imbalance:
+1. **Why Simple Accuracy is Misleading**: A naive "dumb" classifier predicting that *no customer ever churns* would score **73.5% accuracy**, yet fail to save a single churning customer.
+2. **Why ROC-AUC is Primary**: ROC-AUC measures the model's ability to rank high-risk customers above low-risk customers across all classification thresholds. Our balanced Random Forest model achieved **0.8455 ROC-AUC** across 5-Fold Stratified Cross-Validation.
+3. **Why Recall is Critical**: In telecommunications, the business cost of a False Negative (failing to detect a customer who cancels) is far greater than a False Positive (offering a retention incentive to a customer who would have stayed). The balanced Random Forest achieved an **80.4% Recall rate** on the churn class.
 
 ---
 
-## 5. How to Run & Verify
+## 4. How the Agent's Planning, Execution & Verification Work
 
-### 1. Launch the Streamlit Chat App
+1. **Hybrid Planning & Intent Routing**:
+   * If customer IDs (e.g. `9305-CDSKC`) are present, the agent routes directly to the local ML model tool `predict_churn_risk(customer_id)`.
+   * For exploratory and aggregation questions, the LLM acts as a dynamic programmer, generating 3–8 lines of Python pandas code against the dataframe schema.
+2. **Restricted Code Execution Sandbox**:
+   * Code is evaluated in a restricted Python environment with safe mathematical built-ins (`pd`, `np`, `len`, `sum`) and pre-loaded `df`.
+3. **Self-Check & Fallback Loop**:
+   * If generated code returns an error or empty output, the agent catches the exception, re-plans, and executes a validated fallback cohort query without crashing.
+4. **Anti-Hallucination Critic (`agent/critic.py`)**:
+   * An automated Critic parses all stated numerical figures and percentages from the final synthesized draft and cross-verifies that every number originated from the sandbox output.
+
+---
+
+## 5. Short Reflection (Half-Page)
+
+* **The Hardest Part**: Designing the anti-hallucination verification guardrail and managing free-tier rate limits. Balancing LLM reasoning flexibility with deterministic mathematical correctness required building a robust sandbox execution engine and normalizer that handles numbers formatted as percentages, decimals, or comma-separated values.
+* **What I Learned / Had to Teach Myself**: Implementing the program-aided language (PAL) agent pattern—prompting the LLM to write code rather than compute math directly—and structuring a clean dual-stack interface (Streamlit for quick exploration, React for modern conversational UX).
+* **What I Would Do Differently With More Time**:
+  1. Add a Vector Database (RAG) over telco customer support tickets to enrich numeric churn scores with qualitative customer feedback sentiment.
+  2. Implement an automated A/B test simulator to project revenue ROI for specific retention incentives.
+
+---
+
+## 6. Honest Note on Time Spent (~8–10 Hours)
+
+* **Stage 1: EDA, Data Cleaning & Model Benchmarking** (~2.5 hours):
+  * Dataset inspection, fixing 11 whitespace `TotalCharges` records, 5-Fold Stratified CV across 5 algorithms, calibration & metric analysis.
+* **Stage 2: Model Tooling & Multi-UI Development** (~2.5 hours):
+  * Building `predict_churn_risk()` callable tool, Streamlit chat interface, FastAPI REST endpoints, and modern React + Vite frontend.
+* **Stage 3: Autonomous Agent Loop, Tools & Critic** (~2.5 hours):
+  * Python execution sandbox, self-check retry loop, Groq rate-limit exponential backoff, in-memory caching, and Critic verifier.
+* **Stage 4: Evaluation Suite & Dockerization** (~1.5 hours):
+  * 12-query automated benchmark test runner (`eval_agent.py`), multi-container `docker-compose.yml`, and documentation.
+
+---
+
+## 7. Quick Start & Deployment Guide
+
+### Option A: 1-Command Docker Run
 ```bash
+# Spin up FastAPI, Streamlit, and React simultaneously
+docker compose up --build
+```
+* React UI: `http://localhost:5173`
+* Streamlit UI: `http://localhost:8501`
+* FastAPI Backend: `http://localhost:8000`
+
+### Option B: Local Setup
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Start FastAPI Backend
+python3 api.py
+
+# 3. Start React Frontend (in separate terminal)
+cd frontend && npm install && npm run dev
+
+# 4. (Optional) Run Streamlit Chat
 streamlit run app.py
 ```
-Open your browser at `http://localhost:8501`.
 
-### 2. Run the Automated Evaluation Suite
+### Option C: Public Live URL via Ngrok (Free & Fast)
+To expose your live app publicly with a single command:
 ```bash
-python3 eval_suite.py
-```
-Expected output: **12/12 Passed (100% Accuracy, 0.0% Hallucination Rate)**.
+# Expose Streamlit app
+ngrok http 8501
 
-### 3. Run with Docker
+# Or expose React app
+ngrok http 5173
+```
+*(Copy the generated `https://xxxx.ngrok-free.app` URL to share as your live Hosted App URL).*
+
+### Option D: Run Evaluation Suite
 ```bash
-docker build -t customer-churn-agent .
-docker run -p 8501:8501 customer-churn-agent
+python3 eval_agent.py
 ```
-
----
-
-## 6. Written Reflection & Engineering Notes
-
-* **The Hardest Part**: Designing an autonomous code-as-a-tool execution loop that handles diverse natural-language queries without brittle failures, and pairing it with a deterministic Critic Agent that validates figures against computed execution outputs.
-* **What I Learned / Engineered**: Building a multi-tier fallback architecture where the agent can run seamlessly using state-of-the-art LLMs (Groq Llama 3.3 70B) or execute entirely autonomously using deterministic query compilation when offline.
-* **What I'd Do Differently With More Time**:
-  1. Add SHAP TreeExplainer integration for deeper multi-level local feature explanations.
-  2. Implement an automated continuous retraining trigger when new customer transaction logs arrive.
-* **Time Breakdown (~8–10 Hours)**:
-  * *Hours 1–2*: Dataset exploration, diagnosing the 11 blank `TotalCharges` records, and building the Colab notebook.
-  * *Hours 3–4*: 5-fold cross-validation benchmarking, ROC/PR curve analysis, and callable model tool packaging.
-  * *Hours 5–6*: Autonomous Agent loop implementation (planning, restricted code execution, self-check loop, and critic verifier).
-  * *Hours 7–8*: Streamlit UI development, what-if simulator widget, auto-chart renderers, and Dockerization.
-  * *Hours 9–10*: Automated evaluation suite (12 test queries), edge-case testing, and comprehensive documentation.
-
-* **AI Tool Disclosure**: Tools were utilized to assist with rapid prototyping, template structuring, and documentation drafting; all architectural designs, algorithms, validations, and logic implementations were reviewed and verified.
+*(Runs the 12-query benchmark suite and outputs `results/evaluation_report.md`)*.

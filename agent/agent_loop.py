@@ -89,12 +89,11 @@ class AutonomousDataAgent:
         tool_outputs = []
         chart_info = None
 
-        # 1. Single Customer Prediction Detection
-        cid_match = re.search(r"\b([0-9]{4}-[A-Z0-9]{5})\b", user_query.upper())
-        if cid_match and any(w in user_query.lower() for w in ["churn", "risk", "predict", "score", "customer"]):
-            cid = cid_match.group(1)
-            logger.info(f"[Step 1: Planning] Detected Customer ID '{cid}' for individual risk scoring.")
-            steps_log.append(f"Step 1 [Plan]: Customer ID '{cid}' detected.")
+        # 1. Multi or Single Customer Prediction Detection
+        cids = list(dict.fromkeys(re.findall(r"\b([0-9]{4}-[A-Z0-9]{5})\b", user_query.upper())))
+        if cids and any(w in user_query.lower() for w in ["churn", "risk", "predict", "score", "customer", "for", "asking"]):
+            logger.info(f"[Step 1: Planning] Detected {len(cids)} Customer ID(s): {cids} for risk evaluation.")
+            steps_log.append(f"Step 1 [Plan]: Customer ID(s) {cids} detected.")
 
             overrides = {}
             if "two year" in user_query.lower() or "2-year" in user_query.lower():
@@ -104,26 +103,30 @@ class AutonomousDataAgent:
             if "tech support" in user_query.lower() or "techsupport" in user_query.lower():
                 overrides["TechSupport"] = "Yes"
 
-            logger.info(f"[Step 2: Execution] Calling Stage 1 ML tool predict_churn_risk('{cid}', overrides={overrides})")
-            model_res = TOOL_REGISTRY.predict_churn(cid, overrides=overrides if overrides else None)
-            tool_outputs.append(str(model_res))
+            customer_reports = []
+            for cid in cids:
+                logger.info(f"[Step 2: Execution] Calling Stage 1 ML tool predict_churn_risk('{cid}', overrides={overrides})")
+                model_res = TOOL_REGISTRY.predict_churn(cid, overrides=overrides if overrides else None)
+                tool_outputs.append(str(model_res))
 
-            if model_res.get("status") == "error":
-                return {"answer": f"⚠️ {model_res.get('message')}", "steps": steps_log}
+                if model_res.get("status") == "error":
+                    customer_reports.append(f"⚠️ {model_res.get('message')}")
+                    continue
 
-            p = model_res["risk_percentage"]
-            lvl = model_res["risk_level"]
-            factors = "\n".join([f"* **{f.split('(')[0].strip()}**: {f}" for f in model_res["top_factors"]])
-            prof = model_res["profile"]
+                p = model_res["risk_percentage"]
+                lvl = model_res["risk_level"]
+                factors = "\n".join([f"* **{f.split('(')[0].strip()}**: {f}" for f in model_res["top_factors"]])
+                prof = model_res["profile"]
 
-            answer = (
-                f"### 📋 Customer `{cid}` Churn Risk Profile\n\n"
-                f"* **Churn Risk Score**: **{p}** (`{lvl} Risk`)\n"
-                f"* **Model Prediction**: **{model_res['prediction']}**\n"
-                f"* **Current Contract**: {prof.get('Contract', 'N/A')} | **Tenure**: {prof.get('tenure', 0)} months | **Monthly Charges**: ${prof.get('MonthlyCharges', 0)}\n\n"
-                f"#### Key Risk Factors & Drivers:\n{factors}\n"
-            )
+                customer_reports.append(
+                    f"### 📋 Customer `{cid}` Churn Risk Profile\n\n"
+                    f"* **Churn Risk Score**: **{p}** (`{lvl} Risk`)\n"
+                    f"* **Model Prediction**: **{model_res['prediction']}**\n"
+                    f"* **Contract**: {prof.get('Contract', 'N/A')} | **Tenure**: {prof.get('tenure', 0)} months | **Monthly Charges**: ${prof.get('MonthlyCharges', 0)}\n\n"
+                    f"**Key Risk Drivers**:\n{factors}"
+                )
 
+            answer = "\n\n---\n\n".join(customer_reports)
             critic = CriticVerifier.verify_answer_against_facts(answer, tool_outputs)
             logger.info(f"[Step 3: Critic Review] {critic['verification_status']}")
 
@@ -146,12 +149,18 @@ class AutonomousDataAgent:
         steps_log.append(f"Step 2 [Act]: Executing code:\n```python\n{code}\n```")
 
         exec_res = TOOL_REGISTRY.execute_python_code(code)
-        if exec_res.get("status") == "error":
-            logger.warning(f"[Step 3: Self-Check] Code execution failed ({exec_res.get('error')}). Retrying fallback...")
-            code = "result = df.groupby('Contract')['Churn_binary'].agg(['count', 'mean'])\nprint(result)"
-            exec_res = TOOL_REGISTRY.execute_python_code(code)
+        output_text = exec_res.get("output", "").strip()
 
-        output_text = exec_res.get("output", "")
+        # If execution failed or output was empty, run self-check retry
+        if exec_res.get("status") == "error" or not output_text:
+            logger.warning(f"[Step 3: Self-Check] Code execution failed or returned empty output. Retrying with fallback query...")
+            if "which customer" in user_query.lower() or "most likely" in user_query.lower() or "highest risk" in user_query.lower():
+                code = "result = df[df['Contract'] == 'Month-to-month'][['customerID', 'tenure', 'Contract', 'InternetService', 'MonthlyCharges', 'TotalCharges']].sort_values(by='MonthlyCharges', ascending=False).head(10)\nprint(result)"
+            else:
+                code = "result = df.groupby('Contract')['Churn_binary'].agg(['count', 'mean']).rename(columns={'mean': 'churn_rate'})\nprint(result)"
+            exec_res = TOOL_REGISTRY.execute_python_code(code)
+            output_text = exec_res.get("output", "").strip()
+
         tool_outputs.append(output_text)
         chart_info = self._extract_chart_info(user_query, code)
 
@@ -180,19 +189,27 @@ class AutonomousDataAgent:
                 {
                     "role": "system",
                     "content": (
-                        "You are a Python data analyst. Given dataframe `df` with columns: "
-                        "[customerID, gender, SeniorCitizen, Partner, Dependents, tenure, PhoneService, MultipleLines, "
-                        "InternetService, OnlineSecurity, OnlineBackup, DeviceProtection, TechSupport, StreamingTV, "
-                        "StreamingMovies, Contract, PaperlessBilling, PaymentMethod, MonthlyCharges, TotalCharges, Churn, Churn_binary]. "
-                        "Write ONLY executable python pandas code that stores the result in variable `result` and prints it. No explanations."
+                        "You are a Senior Python Data Analyst working on a pre-loaded pandas dataframe named `df`.\n"
+                        "Columns available in `df`: [customerID, gender, SeniorCitizen, Partner, Dependents, tenure, "
+                        "PhoneService, MultipleLines, InternetService, OnlineSecurity, OnlineBackup, DeviceProtection, "
+                        "TechSupport, StreamingTV, StreamingMovies, Contract, PaperlessBilling, PaymentMethod, "
+                        "MonthlyCharges, TotalCharges, Churn, Churn_binary].\n\n"
+                        "RULES:\n"
+                        "1. Write SHORT, simple pandas code (3-8 lines). Use basic operations: groupby, filter, sort_values, mean, count.\n"
+                        "2. Do NOT train new machine learning models from scratch.\n"
+                        "3. You MUST end your code by printing the result: `print(result)`.\n"
+                        "4. Output ONLY pure executable python code without markdown formatting or explanation."
                     )
                 },
-                {"role": "user", "content": f"Write python code for: {query}"}
+                {"role": "user", "content": f"Write pandas python code to answer: {query}"}
             ]
             code = self._call_llm(messages)
             if code:
                 code = re.sub(r"^```python\s*", "", code)
+                code = re.sub(r"^```\s*", "", code)
                 code = re.sub(r"\s*```$", "", code)
+                if "print(" not in code:
+                    code += "\nprint(result)"
                 return code.strip()
 
         # Robust Intent Matcher

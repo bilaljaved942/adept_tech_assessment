@@ -1,32 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, Paperclip, Mic } from 'lucide-react';
+import { Send, Sparkles } from 'lucide-react';
 import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import ChatMessage from './components/ChatMessage';
 import SimulatorModal from './components/SimulatorModal';
 
 const API_BASE = 'http://localhost:8000/api';
 
 export default function App() {
-  const [theme, setTheme] = useState('light');
   const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Hello! I am your **Autonomous Data Analyst Agent**. I can analyze customer churn patterns, compute aggregations, run what-if simulations, and predict churn risk for any customer.',
-      steps: []
+      content: 'Hello! I am your **Autonomous Data Analyst Agent**. Ask me anything about customer churn patterns, group comparisons, revenue impact, or single customer risk scores.'
     }
   ]);
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [overview, setOverview] = useState(null);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
-  const [apiKey, setApiKey] = useState('');
   const messagesEndRef = useRef(null);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
 
   useEffect(() => {
     fetch(`${API_BASE}/overview`)
@@ -38,10 +30,6 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
 
   const handleSendMessage = async (textToSend) => {
     const text = textToSend || inputQuery;
@@ -56,10 +44,7 @@ export default function App() {
       const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          api_key: apiKey || null
-        })
+        body: JSON.stringify({ message: text })
       });
 
       const data = await res.json();
@@ -68,9 +53,7 @@ export default function App() {
         {
           role: 'assistant',
           content: data.answer,
-          steps: data.steps,
-          chart: data.chart,
-          critic_status: data.critic_status
+          chart: data.chart
         }
       ]);
     } catch (err) {
@@ -78,8 +61,7 @@ export default function App() {
         ...prev,
         {
           role: 'assistant',
-          content: '⚠️ Failed to connect to Backend Server. Please ensure `python3 api.py` is running on port 8000.',
-          steps: []
+          content: '⚠️ Failed to connect to Backend Server. Please ensure `python3 api.py` or Docker container is running.'
         }
       ]);
     } finally {
@@ -94,8 +76,7 @@ export default function App() {
       setMessages([
         {
           role: 'assistant',
-          content: 'New session started! Ask me any question about customer churn, distributions, or specific customer risks.',
-          steps: []
+          content: 'New session started! Ask me any question about customer churn, distributions, or specific customer IDs.'
         }
       ]);
     }
@@ -106,7 +87,7 @@ export default function App() {
     "What is the churn risk for customer 7590-VHVEG?",
     "Does churn risk correlate with contract type?",
     "Show me churn rate by internet service",
-    "What if customer 7590-VHVEG switches to a Two year contract?"
+    "Show me revenue trend for high risk customers"
   ];
 
   return (
@@ -120,35 +101,27 @@ export default function App() {
       />
 
       <div className="main-chat-area">
-        <Header 
-          theme={theme}
-          toggleTheme={toggleTheme}
-          apiKey={apiKey}
-          onOpenApiKeyModal={() => {
-            const key = prompt("Enter your free Groq API key (or leave empty to use built-in engine):", apiKey);
-            if (key !== null) setApiKey(key.trim());
-          }}
-        />
-
-        {/* Top KPI Metrics Banner */}
+        {/* Compact KPI Metrics Banner */}
         <div className="kpi-banner">
           <div className="kpi-card">
-            <div className="kpi-label">Total Customers</div>
+            <div className="kpi-label">Customers</div>
             <div className="kpi-value">{overview ? `${overview.total_customers.toLocaleString()}` : '7,043'}</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-label">Overall Churn Rate</div>
+            <div className="kpi-label">Churn Rate</div>
             <div className="kpi-value" style={{ color: '#ef4444' }}>
               {overview ? `${overview.churn_percentage}%` : '26.5%'}
             </div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-label">Avg Monthly Spend</div>
+            <div className="kpi-label">Avg Monthly</div>
             <div className="kpi-value">{overview ? `$${overview.avg_monthly_charges}` : '$64.76'}</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-label">Model Accuracy (ROC-AUC)</div>
-            <div className="kpi-value" style={{ color: '#10b981' }}>0.8455</div>
+            <div className="kpi-label">ROC-AUC</div>
+            <div className="kpi-value" style={{ color: '#10b981' }}>
+              {overview ? `${overview.model_roc_auc}` : '0.8455'}
+            </div>
           </div>
         </div>
 
@@ -161,12 +134,12 @@ export default function App() {
           {loading && (
             <div className="chat-row">
               <div className="avatar ai">
-                <Sparkles size={20} />
+                <Sparkles size={18} />
               </div>
               <div className="message-content-wrapper">
                 <div className="message-bubble ai" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
-                  <Sparkles size={16} className="animate-spin" />
-                  <span>Agent is planning steps & running queries against the dataset...</span>
+                  <Sparkles size={16} />
+                  <span>Agent is analyzing dataset...</span>
                 </div>
               </div>
             </div>
@@ -204,12 +177,9 @@ export default function App() {
               className="send-btn" 
               disabled={!inputQuery.trim() || loading}
             >
-              <Send size={18} />
+              <Send size={16} />
             </button>
           </form>
-          <div style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
-            Autonomous Data Analyst • Zero Hallucination Verified with Critic Agent
-          </div>
         </div>
       </div>
 
