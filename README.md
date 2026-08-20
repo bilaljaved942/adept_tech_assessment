@@ -129,9 +129,9 @@ Here is an honest breakdown of where the time was spent across the assessment:
   * Investigating the dataset, diagnosing the 11 blank `TotalCharges` records, setting up 5-fold Stratified Cross-Validation across 5 models, generating ROC/PR curves, and exporting the trained pipeline.
 * **Stage 2 — UI & Tool Integration (~2.5 hours)**:
   * Creating the `predict_churn_risk()` callable tool, building the Streamlit dashboard with KPI cards and charts, and building the optional React + Vite frontend with FastAPI endpoints.
-* **Stage 3 — Autonomous Agent & Critic Engine (~2.5 hours)**:
+* **Stage 3 — Autonomous Agent & Critic Engine (~3 hours)**:
   * Implementing the planning loop, restricted Python code execution sandbox, prompt engineering, rate-limit backoff, and the anti-hallucination Critic verifier.
-* **Stage 4 — Evaluation Suite, Docker & Documentation (~1.5 hours)**:
+* **Stage 4 — Evaluation Suite, Deployment, Docker & Documentation (~1 hour)**:
   * Building the 12-test automated eval benchmark (`eval_agent.py`), resolving container build dependencies in `docker-compose.yml`, and writing this documentation.
 
 ---
