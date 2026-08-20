@@ -25,9 +25,9 @@ def render_kpi_cards(df: pd.DataFrame):
     with col4:
         st.metric("Model ROC-AUC", "0.8455", delta="80.4% Recall")
 
-def render_chart(chart_info: dict, df: pd.DataFrame):
+def render_chart(df: pd.DataFrame, chart_info: dict = None):
     """Renders dynamic charts in the chat based on the query."""
-    if not chart_info:
+    if chart_info is None or not isinstance(chart_info, dict):
         return
         
     c_type = chart_info.get("type")
@@ -38,20 +38,25 @@ def render_chart(chart_info: dict, df: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(8, 4))
     sns.set_theme(style="whitegrid")
     
-    if c_type == "bar":
-        grp = chart_info.get("group_by")
-        metric = chart_info.get("metric", "Churn_binary")
-        if grp in df.columns:
-            plot_df = df.groupby(grp)[metric].mean().reset_index()
-            sns.barplot(data=plot_df, x=grp, y=metric, palette="coolwarm", ax=ax)
-            ax.set_ylabel("Churn Rate" if "Churn" in metric else metric)
-            ax.set_title(title)
-            plt.xticks(rotation=15, ha="right")
-            st.pyplot(fig)
-            
-    elif c_type == "hist":
-        col = chart_info.get("column", "tenure")
-        if col in df.columns:
-            sns.histplot(data=df, x=col, hue="Churn", multiple="stack", palette=["#4CAF50", "#F44336"], ax=ax)
-            ax.set_title(title)
-            st.pyplot(fig)
+    try:
+        if c_type == "bar":
+            grp = chart_info.get("group_by")
+            metric = chart_info.get("metric", "Churn_binary")
+            if grp in df.columns:
+                plot_df = df.groupby(grp)[metric].mean().reset_index()
+                sns.barplot(data=plot_df, x=grp, y=metric, palette="coolwarm", ax=ax)
+                ax.set_ylabel("Churn Rate" if "Churn" in metric else metric)
+                ax.set_title(title)
+                plt.xticks(rotation=15, ha="right")
+                st.pyplot(fig)
+                plt.close(fig)
+                
+        elif c_type == "hist":
+            col = chart_info.get("column", "tenure")
+            if col in df.columns:
+                sns.histplot(data=df, x=col, hue="Churn", multiple="stack", palette=["#4CAF50", "#F44336"], ax=ax)
+                ax.set_title(title)
+                st.pyplot(fig)
+                plt.close(fig)
+    except Exception as e:
+        plt.close(fig)

@@ -11,11 +11,10 @@ export default function ChatMessage({ message }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Simple Markdown parser for bold, headers, and tables
+  // Simple Markdown parser for bold, headers, lists, and tables
   const renderFormattedContent = (text) => {
     if (!text) return '';
 
-    // Split text into lines
     const lines = text.split('\n');
     const elements = [];
     let tableRows = [];
@@ -25,7 +24,6 @@ export default function ChatMessage({ message }) {
       // Table row detection
       if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
         inTable = true;
-        // Ignore markdown divider | :--- | :--- |
         if (!line.includes('---')) {
           const cells = line.split('|').filter(c => c !== '').map(c => c.trim());
           tableRows.push(cells);
@@ -64,26 +62,26 @@ export default function ChatMessage({ message }) {
 
       // Headers
       if (line.startsWith('### ')) {
-        elements.push(<h3 key={idx} style={{ fontSize: '1.1rem', fontWeight: 700, margin: '8px 0', color: 'var(--text-primary)' }}>{line.replace('### ', '')}</h3>);
+        elements.push(<h3 key={idx} style={{ fontSize: '1.05rem', fontWeight: 700, margin: '8px 0', color: 'var(--text-primary)' }}>{line.replace('### ', '')}</h3>);
+      } else if (line.startsWith('## ')) {
+        elements.push(<h2 key={idx} style={{ fontSize: '1.15rem', fontWeight: 700, margin: '10px 0', color: 'var(--text-primary)' }}>{line.replace('## ', '')}</h2>);
       } else if (line.startsWith('#### ')) {
-        elements.push(<h4 key={idx} style={{ fontSize: '0.95rem', fontWeight: 600, margin: '6px 0', color: 'var(--text-primary)' }}>{line.replace('#### ', '')}</h4>);
-      } else if (line.startsWith('* ') || line.startsWith('- ')) {
-        // Bullet item
+        elements.push(<h4 key={idx} style={{ fontSize: '0.92rem', fontWeight: 600, margin: '6px 0', color: 'var(--text-primary)' }}>{line.replace('#### ', '')}</h4>);
+      } else if (line.startsWith('* ') || line.startsWith('- ') || line.startsWith('• ')) {
         const rawItem = line.substring(2);
         elements.push(
-          <div key={idx} style={{ display: 'flex', gap: 6, margin: '3px 0', fontSize: '0.9rem' }}>
+          <div key={idx} style={{ display: 'flex', gap: 6, margin: '3px 0', fontSize: '0.88rem' }}>
             <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>•</span>
             <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(rawItem) }} />
           </div>
         );
       } else if (line.trim() !== '') {
         elements.push(
-          <p key={idx} style={{ margin: '4px 0', fontSize: '0.92rem' }} dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(line) }} />
+          <p key={idx} style={{ margin: '4px 0', fontSize: '0.9rem' }} dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(line) }} />
         );
       }
     });
 
-    // Flush any remaining table
     if (tableRows.length > 0) {
       const header = tableRows[0];
       const body = tableRows.slice(1);
@@ -123,7 +121,7 @@ export default function ChatMessage({ message }) {
   return (
     <div className="chat-row">
       <div className={`avatar ${isUser ? 'user' : 'ai'}`}>
-        {isUser ? <User size={20} /> : <Bot size={20} />}
+        {isUser ? <User size={18} /> : <Bot size={18} />}
       </div>
 
       <div className="message-content-wrapper">
@@ -133,59 +131,79 @@ export default function ChatMessage({ message }) {
 
         <div className={`message-bubble ${isUser ? 'user' : 'ai'}`}>
           {isUser ? (
-            <div style={{ fontSize: '0.95rem' }}>{message.content}</div>
+            <div style={{ fontSize: '0.92rem' }}>{message.content}</div>
           ) : (
             <div>{renderFormattedContent(message.content)}</div>
           )}
 
-          {/* Visual Chart rendered directly in message */}
+          {/* Visual Chart rendering */}
           {message.chart && (
             <div className="chart-container">
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 12, color: 'var(--text-primary)' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: 10, color: 'var(--text-primary)' }}>
                 📊 {message.chart.title}
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, height: 160, padding: '10px 0' }}>
-                {message.chart.group_by === 'Contract' && (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 140, padding: '8px 0' }}>
+                {(message.chart.group_by === 'Contract' || message.chart.column === 'Contract') && (
                   <>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#ef4444', width: '100%', height: '85%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>Month-to-month (42.7%)</span>
+                      <div style={{ background: '#ef4444', width: '100%', height: '85%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>Month-to-month (42.7%)</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#94a3b8', width: '100%', height: '23%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>One year (11.3%)</span>
+                      <div style={{ background: '#94a3b8', width: '100%', height: '23%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>One year (11.3%)</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#10b981', width: '100%', height: '6%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>Two year (2.8%)</span>
+                      <div style={{ background: '#10b981', width: '100%', height: '6%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>Two year (2.8%)</span>
                     </div>
                   </>
                 )}
-                {message.chart.group_by === 'InternetService' && (
+                {(message.chart.group_by === 'InternetService' || message.chart.column === 'InternetService') && (
                   <>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#ef4444', width: '100%', height: '84%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>Fiber optic (41.9%)</span>
+                      <div style={{ background: '#ef4444', width: '100%', height: '84%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>Fiber optic (41.9%)</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#3b82f6', width: '100%', height: '38%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>DSL (19.0%)</span>
+                      <div style={{ background: '#3b82f6', width: '100%', height: '38%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>DSL (19.0%)</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#10b981', width: '100%', height: '15%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>No Internet (7.4%)</span>
+                      <div style={{ background: '#10b981', width: '100%', height: '15%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>No Internet (7.4%)</span>
+                    </div>
+                  </>
+                )}
+                {(message.chart.type === 'hist' || message.chart.column === 'tenure') && (
+                  <>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ background: '#ef4444', width: '100%', height: '95%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>0-12m (47.4%)</span>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ background: '#f59e0b', width: '100%', height: '57%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>13-24m (28.7%)</span>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ background: '#3b82f6', width: '100%', height: '41%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>25-48m (20.4%)</span>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ background: '#10b981', width: '100%', height: '19%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>49+m (9.5%)</span>
                     </div>
                   </>
                 )}
                 {message.chart.group_by === 'Churn' && (
                   <>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#ef4444', width: '100%', height: '74%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>Churned ($74.44/mo)</span>
+                      <div style={{ background: '#ef4444', width: '100%', height: '74%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>Churned ($74.44/mo)</span>
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                      <div style={{ background: '#10b981', width: '100%', height: '61%', borderRadius: '6px 6px 0 0' }}></div>
-                      <span style={{ fontSize: '0.75rem', marginTop: 6, fontWeight: 500 }}>Retained ($61.27/mo)</span>
+                      <div style={{ background: '#10b981', width: '100%', height: '61%', borderRadius: '4px 4px 0 0' }}></div>
+                      <span style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 500 }}>Retained ($61.27/mo)</span>
                     </div>
                   </>
                 )}
@@ -196,12 +214,12 @@ export default function ChatMessage({ message }) {
 
         {/* Copy action */}
         {!isUser && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
             <button 
               onClick={handleCopy}
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}
             >
-              {copied ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+              {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
