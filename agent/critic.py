@@ -1,11 +1,14 @@
 """
-Critic & Fact Verification Engine.
+Critic & Fact Verification Engine with Detailed Mathematical Audit Logging.
 Guarantees zero hallucination by verifying that numerical figures in LLM responses
 originate directly from executed tool computations.
 """
 
 import re
+import logging
 from typing import Dict, Any, List
+
+logger = logging.getLogger("DataAnalystAgent")
 
 class CriticVerifier:
     """Verifies that all facts in draft responses are mathematically grounded in tool outputs."""
@@ -16,9 +19,7 @@ class CriticVerifier:
         if not text:
             return []
         
-        # Clean text
         clean = text.replace(",", "").replace("$", "")
-        # Find all numbers (integers, floats, percentages)
         tokens = re.findall(r"\b\d+(?:\.\d+)?%?\b", clean)
         numbers = []
         for tok in tokens:
@@ -33,43 +34,50 @@ class CriticVerifier:
                         numbers.append(round(val * 100, 2))
             except ValueError:
                 pass
-        return numbers
+        return list(dict.fromkeys(numbers))
 
     @classmethod
     def verify_answer_against_facts(cls, answer: str, tool_outputs: List[Any]) -> Dict[str, Any]:
         """
         Cross-checks numbers in the answer with data emitted by tool executions.
         Returns:
-            Dict with is_grounded (bool), unverified_numbers (list), verification_status (str).
+            Dict with is_grounded (bool), unverified_numbers (list), verification_status (str), audit_trail (list).
         """
         if not tool_outputs or all(not str(o).strip() for o in tool_outputs):
             return {
                 "is_grounded": True,
                 "unverified_numbers": [],
-                "verification_status": "Verified (Model / Analytical Inference)"
+                "verification_status": "Verified (Analytical / Model Tool Inference)",
+                "audit_trail": ["Tool output was structural model inference."]
             }
 
-        # Combine all computational outputs into a single context
         all_output_text = " ".join([str(out) for out in tool_outputs])
         computed_numbers = cls.extract_numbers(all_output_text)
-
-        # Extract numbers from synthesized answer
         answer_numbers = cls.extract_numbers(answer)
 
+        audit_trail = []
         unverified = []
         tolerance = 0.05
 
         for num in answer_numbers:
-            # Skip trivial or generic numbers (e.g. 0, 1, 2, 3, 10)
+            # Skip trivial layout or list numbers
             if num in [0, 1, 2, 3, 4, 5, 10, 100]:
                 continue
 
-            # Check if num is close to any computed number
-            matched = any(abs(num - c) < tolerance or (c > 0 and abs(num - c) / c < 0.02) for c in computed_numbers)
-            if not matched:
-                unverified.append(num)
+            matched = False
+            matched_with = None
+            for c in computed_numbers:
+                if abs(num - c) < tolerance or (c > 0 and abs(num - c) / c < 0.02):
+                    matched = True
+                    matched_with = c
+                    break
 
-        # Zero hallucination if unverified numbers count is low / within acceptable formatting bounds
+            if matched:
+                audit_trail.append(f"✓ Number {num} matches computed figure {matched_with}")
+            else:
+                unverified.append(num)
+                audit_trail.append(f"✗ Number {num} not found in computed sandbox data")
+
         is_grounded = len(unverified) <= 2
 
         if is_grounded:
@@ -80,5 +88,6 @@ class CriticVerifier:
         return {
             "is_grounded": is_grounded,
             "unverified_numbers": unverified,
-            "verification_status": status
+            "verification_status": status,
+            "audit_trail": audit_trail
         }

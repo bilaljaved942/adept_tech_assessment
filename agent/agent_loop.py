@@ -1,5 +1,5 @@
 """
-Autonomous Data Analyst Agent Loop with Rate Limit Resilience, Model Fallbacks & Clean Formatting.
+Autonomous Data Analyst Agent Loop with Rate Limit Resilience, Model Fallbacks & Detailed Audit Logging.
 """
 
 import os
@@ -58,13 +58,12 @@ class AutonomousDataAgent:
                         model=model,
                         messages=messages,
                         temperature=0.0,
-                        max_tokens=600
+                        max_tokens=1000
                     )
                     return resp.choices[0].message.content.strip()
                 except Exception as e:
                     err_str = str(e).lower()
-                    if "404" in err_str or "model_not_found" in err_str or "does not exist" in err_str:
-                        # Try next available model in candidate list
+                    if "404" in err_str or "model_not_found" in err_str or "does not exist" in err_str or "decommissioned" in err_str:
                         break
                     elif "429" in err_str or "rate limit" in err_str:
                         logger.warning(f"Groq rate limit on {model}. Retrying in {delay}s...")
@@ -78,11 +77,14 @@ class AutonomousDataAgent:
     def run_query(self, user_query: str) -> Dict[str, Any]:
         """Main planning, execution, and verification loop."""
         engine_mode = f"Groq LLM ({self.model_name})" if self.api_key else "Local Autonomous Sandbox"
-        logger.info(f"=== NEW QUERY: '{user_query}' | Engine: {engine_mode} ===")
+        logger.info(f"\n=======================================================")
+        logger.info(f"🔎 INCOMING QUERY: '{user_query}'")
+        logger.info(f"⚙️ ACTIVE ENGINE : {engine_mode}")
+        logger.info(f"=======================================================")
         
         query_key = user_query.strip().lower()
         if query_key in self._cache:
-            logger.info("Serving response from in-memory cache.")
+            logger.info("⚡ [CACHE HIT]: Serving previously verified response from in-memory cache (0 tokens used).")
             return self._cache[query_key]
 
         steps_log = []
@@ -92,7 +94,8 @@ class AutonomousDataAgent:
         # 1. Multi or Single Customer Prediction Detection
         cids = list(dict.fromkeys(re.findall(r"\b([0-9]{4}-[A-Z0-9]{5})\b", user_query.upper())))
         if cids and any(w in user_query.lower() for w in ["churn", "risk", "predict", "score", "customer", "for", "asking"]):
-            logger.info(f"[Step 1: Planning] Detected {len(cids)} Customer ID(s): {cids} for risk evaluation.")
+            logger.info(f"📋 [STEP 1: INTENT ROUTING] Found {len(cids)} Customer ID(s): {cids}.")
+            logger.info("   -> Reason: Individual accounts detected. Routing directly to Stage 1 ML Model pipeline.")
             steps_log.append(f"Step 1 [Plan]: Customer ID(s) {cids} detected.")
 
             overrides = {}
@@ -105,7 +108,7 @@ class AutonomousDataAgent:
 
             customer_reports = []
             for cid in cids:
-                logger.info(f"[Step 2: Execution] Calling Stage 1 ML tool predict_churn_risk('{cid}', overrides={overrides})")
+                logger.info(f"⚙️ [STEP 2: MODEL INFERENCE] Calling predict_churn_risk('{cid}', overrides={overrides})")
                 model_res = TOOL_REGISTRY.predict_churn(cid, overrides=overrides if overrides else None)
                 tool_outputs.append(str(model_res))
 
@@ -118,6 +121,8 @@ class AutonomousDataAgent:
                 factors = "\n".join([f"* **{f.split('(')[0].strip()}**: {f}" for f in model_res["top_factors"]])
                 prof = model_res["profile"]
 
+                logger.info(f"   -> Result for {cid}: Churn Risk = {p} ({lvl} Risk) | Prediction = {model_res['prediction']}")
+
                 customer_reports.append(
                     f"### 📋 Customer `{cid}` Churn Risk Profile\n\n"
                     f"* **Churn Risk Score**: **{p}** (`{lvl} Risk`)\n"
@@ -127,8 +132,9 @@ class AutonomousDataAgent:
                 )
 
             answer = "\n\n---\n\n".join(customer_reports)
+            logger.info("🛡️ [STEP 3: CRITIC REVIEW] Verifying calculated risk score against model output...")
             critic = CriticVerifier.verify_answer_against_facts(answer, tool_outputs)
-            logger.info(f"[Step 3: Critic Review] {critic['verification_status']}")
+            logger.info(f"   -> Critic Status: {critic['verification_status']}")
 
             result = {
                 "answer": answer,
@@ -141,34 +147,46 @@ class AutonomousDataAgent:
             return result
 
         # 2. General Dataset Aggregation & Analytics
-        logger.info(f"[Step 1: Planning] Formulating pandas code query for: '{user_query}'")
+        logger.info(f"🧠 [STEP 1: PLANNING & CODE FORMULATION]")
+        logger.info(f"   -> Prompting {engine_mode} with dataset schema to generate exact Python pandas query.")
         steps_log.append(f"Step 1 [Plan]: Planning query using {engine_mode}")
 
         code = self._generate_analysis_code(user_query)
-        logger.info(f"[Step 2: Sandbox Execution] Running code:\n{code}")
+        logger.info(f"💻 [STEP 2: RESTRICTED SANDBOX EXECUTION]\n--- Generated Python Code ---\n{code}\n-----------------------------")
         steps_log.append(f"Step 2 [Act]: Executing code:\n```python\n{code}\n```")
 
         exec_res = TOOL_REGISTRY.execute_python_code(code)
         output_text = exec_res.get("output", "").strip()
 
-        # If execution failed or output was empty, run self-check retry
+        # Step 3: Self-Check Loop
         if exec_res.get("status") == "error" or not output_text:
-            logger.warning(f"[Step 3: Self-Check] Code execution failed or returned empty output. Retrying with fallback query...")
+            logger.warning(f"⚠️ [STEP 3: SELF-CHECK FAILED] Output empty or error: {exec_res.get('error')}. Executing robust fallback...")
             if "which customer" in user_query.lower() or "most likely" in user_query.lower() or "highest risk" in user_query.lower():
                 code = "result = df[df['Contract'] == 'Month-to-month'][['customerID', 'tenure', 'Contract', 'InternetService', 'MonthlyCharges', 'TotalCharges']].sort_values(by='MonthlyCharges', ascending=False).head(10)\nprint(result)"
             else:
                 code = "result = df.groupby('Contract')['Churn_binary'].agg(['count', 'mean']).rename(columns={'mean': 'churn_rate'})\nprint(result)"
             exec_res = TOOL_REGISTRY.execute_python_code(code)
             output_text = exec_res.get("output", "").strip()
+        else:
+            logger.info(f"✅ [STEP 3: SELF-CHECK PASSED] Sandbox execution succeeded with 0 errors.")
 
+        logger.info(f"📊 [SANDBOX RAW COMPUTED DATA]:\n{output_text}")
         tool_outputs.append(output_text)
         chart_info = self._extract_chart_info(user_query, code)
 
-        logger.info("[Step 4: Synthesis] Formatting clean, readable summary response.")
+        # Step 4: Synthesis
+        logger.info(f"📝 [STEP 4: BUSINESS SYNTHESIS]")
+        logger.info(f"   -> Transforming raw numeric dictionary/table into an executive markdown report with insights & recommendations.")
         answer = self._format_readable_answer(user_query, output_text, exec_res)
 
+        # Step 5: Anti-Hallucination Critic Review
+        logger.info(f"🛡️ [STEP 5: CRITIC FACT VERIFICATION]")
         critic = CriticVerifier.verify_answer_against_facts(answer, tool_outputs)
-        logger.info(f"[Step 5: Critic Review] {critic['verification_status']}")
+        logger.info(f"   -> Numerical Audit Matches:")
+        for line in critic.get("audit_trail", [])[:6]:
+            logger.info(f"      {line}")
+        logger.info(f"   -> Grounded: {critic['is_grounded']} | Unverified Figures: {critic['unverified_numbers']}")
+        logger.info(f"   -> Status: {critic['verification_status']}")
 
         result = {
             "answer": answer,
@@ -223,9 +241,9 @@ class AutonomousDataAgent:
         elif "payment" in q or "check" in q or "card" in q:
             return "result = df.groupby('PaymentMethod')['Churn_binary'].agg(['count', 'mean']).rename(columns={'mean': 'churn_rate'})\nprint(result)"
         elif "which customer" in q or "most likely" in q or "highest risk" in q or "list" in q:
-            return "result = df[df['Churn'] == 'Yes'][['customerID', 'tenure', 'Contract', 'MonthlyCharges', 'TotalCharges']].head(10)\nprint(result)"
+            return "result = df[df['Contract'] == 'Month-to-month'][['customerID', 'tenure', 'Contract', 'InternetService', 'MonthlyCharges', 'TotalCharges']].sort_values(by='MonthlyCharges', ascending=False).head(10)\nprint(result)"
         elif "tenure" in q or "months" in q:
-            return "result = df.groupby(pd.cut(df['tenure'], bins=[0, 6, 12, 24, 48, 72]))['Churn_binary'].agg(['count', 'mean'])\nprint(result)"
+            return "result = df.groupby(pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72]))['Churn_binary'].agg(['count', 'mean'])\nprint(result)"
         elif "senior" in q or "elder" in q:
             return "result = df.groupby('SeniorCitizen')['Churn_binary'].agg(['count', 'mean']).rename(columns={'mean': 'churn_rate'})\nprint(result)"
         elif "support" in q:
